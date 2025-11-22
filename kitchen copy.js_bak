@@ -54,15 +54,6 @@ function createKitchen() {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  var terraceMat = new THREE.MeshStandardMaterial();
-  terraceMat.color = new THREE.Color(0xa0a0a0);
-  terraceMat.roughness = 0.9;
-  terraceMat.metalness = 0.1;
-  var terraceFloor = new THREE.Mesh(new THREE.BoxGeometry(3, 0.08, 3), terraceMat);
-  terraceFloor.position.set(3.6, -0.06, 0);
-  terraceFloor.receiveShadow = true;
-  scene.add(terraceFloor);
-
   var gridHelper = new THREE.GridHelper(5, 20, 0x888888, 0xcccccc);
   gridHelper.position.y = 0.01;
   scene.add(gridHelper);
@@ -84,98 +75,11 @@ function createKitchen() {
   walls.push(leftWall);
   scene.add(leftWall);
 
-  var frontWallLeft = new THREE.Mesh(new THREE.BoxGeometry(2.47, 2.5, 0.15), wallMat);
-  frontWallLeft.position.set(-0.865, 1.25, 1.36);
-  frontWallLeft.receiveShadow = true;
-  walls.push(frontWallLeft);
-  scene.add(frontWallLeft);
-
-  var frontWallRight = new THREE.Mesh(new THREE.BoxGeometry(3.57, 2.5, 0.15), wallMat);
-  frontWallRight.position.set(3.915, 1.25, 1.36);
-  frontWallRight.receiveShadow = true;
-  walls.push(frontWallRight);
-  scene.add(frontWallRight);
-
-  var doorFrameMat = new THREE.MeshStandardMaterial();
-  doorFrameMat.color = new THREE.Color(0x8b4513);
-  doorFrameMat.roughness = 0.6;
-  doorFrameMat.metalness = 0.2;
-
-  var doorFrameLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.15), doorFrameMat);
-  doorFrameLeft.position.set(0.3, 1.1, 1.36);
-  scene.add(doorFrameLeft);
-
-  var doorFrameRight = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.15), doorFrameMat);
-  doorFrameRight.position.set(1.5, 1.1, 1.36);
-  scene.add(doorFrameRight);
-
-  var doorFrameTop = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.15), doorFrameMat);
-  doorFrameTop.position.set(0.9, 2.2, 1.36);
-  scene.add(doorFrameTop);
-
-  var glassMat = new THREE.MeshStandardMaterial();
-  glassMat.color = new THREE.Color(0x88ccff);
-  glassMat.transparent = true;
-  glassMat.opacity = 0.3;
-  glassMat.roughness = 0.1;
-  glassMat.metalness = 0.9;
-
-  var glassPane = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.05), glassMat);
-  glassPane.position.set(0.9, 1.1, 1.36);
-  scene.add(glassPane);
-
-  var terraceRailingMat = new THREE.MeshStandardMaterial();
-  terraceRailingMat.color = new THREE.Color(0x666666);
-  terraceRailingMat.roughness = 0.4;
-  terraceRailingMat.metalness = 0.7;
-
-  var railing1 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.05, 0.05), terraceRailingMat);
-  railing1.position.set(3.6, 1.0, 1.5);
-  scene.add(railing1);
-
-  var railing2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 3), terraceRailingMat);
-  railing2.position.set(5.1, 1.0, 0);
-  scene.add(railing2);
-
-  for (var p = 0; p < 5; p++) {
-    var post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.0, 0.05), terraceRailingMat);
-    post.position.set(2.6 + p * 0.6, 0.5, 1.5);
-    scene.add(post);
-  }
-
-  var tableMat = new THREE.MeshStandardMaterial();
-  tableMat.color = new THREE.Color(0x8b7355);
-  tableMat.roughness = 0.6;
-  tableMat.metalness = 0.3;
-
-  var tableTop = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.8), tableMat);
-  tableTop.position.set(3.6, 0.7, 0);
-  tableTop.castShadow = true;
-  scene.add(tableTop);
-
-  for (var leg = 0; leg < 4; leg++) {
-    var tableLeg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.7, 0.05), tableMat);
-    var xOff = leg % 2 === 0 ? -0.35 : 0.35;
-    var zOff = leg < 2 ? -0.35 : 0.35;
-    tableLeg.position.set(3.6 + xOff, 0.35, 0 + zOff);
-    tableLeg.castShadow = true;
-    scene.add(tableLeg);
-  }
-
-  var chairMat = new THREE.MeshStandardMaterial();
-  chairMat.color = new THREE.Color(0x555555);
-  chairMat.roughness = 0.7;
-  chairMat.metalness = 0.2;
-
-  var chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.4), chairMat);
-  chairSeat.position.set(3.6, 0.4, -0.6);
-  chairSeat.castShadow = true;
-  scene.add(chairSeat);
-
-  var chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.05), chairMat);
-  chairBack.position.set(3.6, 0.6, -0.8);
-  chairBack.castShadow = true;
-  scene.add(chairBack);
+  var rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 2.72), wallMat);
+  rightWall.position.set(2.1, 1.25, 0);
+  rightWall.receiveShadow = true;
+  walls.push(rightWall);
+  scene.add(rightWall);
 
   var cabinetMat = new THREE.MeshStandardMaterial();
   cabinetMat.color = new THREE.Color(0x8b4513);
@@ -222,15 +126,6 @@ function createKitchen() {
   counter.castShadow = true;
   counter.receiveShadow = true;
   scene.add(counter);
-
-  var sinkMat = new THREE.MeshStandardMaterial();
-  sinkMat.color = new THREE.Color(0xcccccc);
-  sinkMat.roughness = 0.2;
-  sinkMat.metalness = 0.9;
-
-  var sink = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.3), sinkMat);
-  sink.position.set(0.2, 0.83, -1.06);
-  scene.add(sink);
 
   var upperCabs = [];
   upperCabs.push({ x: -1.2, w: 0.8 });
