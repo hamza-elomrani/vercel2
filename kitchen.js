@@ -1,382 +1,685 @@
-// Scene setup
-var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
+var scene, camera, renderer, directionalLight;
+var walls = [];
+var cabinets = [];
+var counter, floor, terraceFloor;
+var currentView = 'perspective';
+var isRotating = true;
+var angle = 0;
+var isDragging = false;
+var previousMousePosition = { x: 0, y: 0 };
+var cameraRotation = { x: 0.3, y: 0 };
+var cameraDistance = 8;
 
-var camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-);
-camera.position.set(8, 5, 8);
-camera.lookAt(0, 0, 0);
+// Touch support
+var touchStartX = 0;
+var touchStartY = 0;
+var touchStartDistance = 0;
 
-var renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadow;
-document.getElementById('canvas-container').appendChild(renderer.domElement);
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 15, 50);
 
-// Lights
-var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(6, 4, 6);
+  camera.lookAt(0, 1, 0);
 
-var sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-sunLight.position.set(10, 15, 10);
-sunLight.castShadow = true;
-sunLight.shadow.mapSize.width = 2048;
-sunLight.shadow.mapSize.height = 2048;
-sunLight.shadow.camera.left = -15;
-sunLight.shadow.camera.right = 15;
-sunLight.shadow.camera.top = 15;
-sunLight.shadow.camera.bottom = -15;
-scene.add(sunLight);
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('container').appendChild(renderer.domElement);
 
-// Materials
-var floorMat = new THREE.MeshStandardMaterial({ 
-    color: 0xDEB887, 
-    roughness: 0.8 
-});
-var wallMat = new THREE.MeshStandardMaterial({ 
-    color: 0xFAF0E6, 
-    roughness: 0.9 
-});
-var woodMat = new THREE.MeshStandardMaterial({ 
-    color: 0x8B4513, 
-    roughness: 0.7 
-});
-var steelMat = new THREE.MeshStandardMaterial({ 
-    color: 0xC0C0C0, 
-    metalness: 0.8, 
-    roughness: 0.2 
-});
-var counterMat = new THREE.MeshStandardMaterial({ 
-    color: 0x654321, 
-    roughness: 0.4 
-});
-var terraceMat = new THREE.MeshStandardMaterial({ 
-    color: 0xA0826D, 
-    roughness: 0.9 
-});
+  var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
 
-// Helper function to create box with shadow
-function createBox(w, h, d, mat, x, y, z, castShadow, receiveShadow) {
-    if (castShadow === undefined) castShadow = true;
-    if (receiveShadow === undefined) receiveShadow = true;
-    
-    var geo = new THREE.BoxGeometry(w, h, d);
-    var mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = castShadow;
-    mesh.receiveShadow = receiveShadow;
-    scene.add(mesh);
-    return mesh;
+  directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(8, 12, 8);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.mapSize.width = 2048;
+  directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.camera.left = -10;
+  directionalLight.shadow.camera.right = 10;
+  directionalLight.shadow.camera.top = 10;
+  directionalLight.shadow.camera.bottom = -10;
+  scene.add(directionalLight);
+
+  var pointLight = new THREE.PointLight(0xffffff, 0.3);
+  pointLight.position.set(0, 2.5, 0);
+  scene.add(pointLight);
+
+  createKitchen();
+  addControls();
+  animate();
 }
 
-// KITCHEN FLOOR (4.20m x 2.72m)
-var kitchenFloor = createBox(4.2, 0.02, 2.72, floorMat, 0, 0.01, 0);
+function createKitchen() {
+  // KITCHEN FLOOR (4.20m x 2.72m)
+  var floorMat = new THREE.MeshStandardMaterial({
+    color: 0xd4b896,
+    roughness: 0.8,
+    metalness: 0.2
+  });
+  floor = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.1, 2.72), floorMat);
+  floor.position.set(0, -0.05, 0);
+  floor.receiveShadow = true;
+  scene.add(floor);
 
-// TERRACE FLOOR (angled trapezoid shape)
-var terraceShape = new THREE.Shape();
-terraceShape.moveTo(0, 0);
-terraceShape.lineTo(0, 2.72);
-terraceShape.lineTo(3.57, 2.72);
-terraceShape.lineTo(3.57 - 0.8, 0);
-terraceShape.closePath();
+  // TERRACE FLOOR - Proper angled trapezoid shape
+  var terraceShape = new THREE.Shape();
+  terraceShape.moveTo(0, 0);
+  terraceShape.lineTo(0, 2.72);
+  terraceShape.lineTo(3.57, 2.72);
+  terraceShape.lineTo(3.57 - 0.8, 0);
+  terraceShape.closePath();
 
-var terraceGeo = new THREE.ExtrudeGeometry(terraceShape, {
-    depth: 0.02,
+  var terraceGeo = new THREE.ExtrudeGeometry(terraceShape, {
+    depth: 0.1,
     bevelEnabled: false
-});
-var terraceMesh = new THREE.Mesh(terraceGeo, terraceMat);
-terraceMesh.rotation.x = -Math.PI / 2;
-terraceMesh.position.set(4.2/2, 0.01, -2.72/2);
-terraceMesh.castShadow = false;
-terraceMesh.receiveShadow = true;
-scene.add(terraceMesh);
-
-// WALLS
-// Back wall
-createBox(4.2, 2.5, 0.15, wallMat, 0, 1.25, -2.72/2 - 0.075);
-
-// Left wall
-createBox(0.15, 2.5, 2.72, wallMat, -4.2/2 - 0.075, 1.25, 0);
-
-// Right wall sections (with door opening)
-createBox(0.15, 2.5, 2.72/2 - 0.6, wallMat, 4.2/2 + 0.075, 1.25, -2.72/4 - 0.3);
-createBox(0.15, 2.5, 2.72/2 - 0.6, wallMat, 4.2/2 + 0.075, 1.25, 2.72/4 + 0.3);
-createBox(0.15, 0.4, 1.2, wallMat, 4.2/2 + 0.075, 2.3, 0);
-
-// Front wall with window
-// Left section
-createBox(2.47, 2.5, 0.15, wallMat, -4.2/2 + 2.47/2, 1.25, 2.72/2 + 0.075);
-
-// Right section
-createBox(4.2 - 2.47 - 1.2, 2.5, 0.15, wallMat, 4.2/2 - (4.2 - 2.47 - 1.2)/2, 1.25, 2.72/2 + 0.075);
-
-// Window bottom
-createBox(1.2, 0.7, 0.15, wallMat, -4.2/2 + 2.47 + 1.2/2, 0.35, 2.72/2 + 0.075);
-
-// Window top
-createBox(1.2, 0.5, 0.15, wallMat, -4.2/2 + 2.47 + 1.2/2, 2.25, 2.72/2 + 0.075);
-
-// Window frame
-var windowFrame = createBox(1.2, 1.4, 0.08, woodMat, -4.2/2 + 2.47 + 1.2/2, 1.4, 2.72/2 + 0.12);
-
-// Window glass
-var glassMat = new THREE.MeshStandardMaterial({ 
-    color: 0xADD8E6, 
-    transparent: true, 
-    opacity: 0.4,
+  });
+  var terraceMat = new THREE.MeshStandardMaterial({
+    color: 0xa8a8a8,
+    roughness: 0.9,
     metalness: 0.1
-});
-var windowGlass = createBox(1.1, 1.3, 0.02, glassMat, -4.2/2 + 2.47 + 1.2/2, 1.4, 2.72/2 + 0.16);
+  });
+  terraceFloor = new THREE.Mesh(terraceGeo, terraceMat);
+  terraceFloor.rotation.x = -Math.PI / 2;
+  terraceFloor.position.set(4.2/2, -0.05, -2.72/2);
+  terraceFloor.receiveShadow = true;
+  scene.add(terraceFloor);
 
-// RANGE COOKER (left front corner)
-var rangeCooker = createBox(0.6, 0.85, 0.6, steelMat, -4.2/2 + 0.4, 0.425, 2.72/2 - 0.4);
+  var wallMat = new THREE.MeshStandardMaterial({
+    color: 0xf5f5dc,
+    roughness: 0.9,
+    metalness: 0.1
+  });
 
-// Cooktop
-var cooktopMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
-createBox(0.58, 0.03, 0.58, cooktopMat, -4.2/2 + 0.4, 0.87, 2.72/2 - 0.4);
+  // KITCHEN WALLS
+  // Back wall
+  var backWall = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.5, 0.15), wallMat);
+  backWall.position.set(0, 1.25, -2.72/2 - 0.075);
+  backWall.receiveShadow = true;
+  walls.push(backWall);
+  scene.add(backWall);
 
-// Burners on range cooker
-var burnerMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-for (var i = 0; i < 2; i++) {
-    for (var j = 0; j < 2; j++) {
-        var burner = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.08, 0.08, 0.02, 32),
-            burnerMat
-        );
-        burner.position.set(
-            -4.2/2 + 0.4 + (i - 0.5) * 0.25,
-            0.89,
-            2.72/2 - 0.4 + (j - 0.5) * 0.25
-        );
-        burner.castShadow = true;
-        scene.add(burner);
-    }
-}
+  // Left wall
+  var leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 2.72), wallMat);
+  leftWall.position.set(-4.2/2 - 0.075, 1.25, 0);
+  leftWall.receiveShadow = true;
+  walls.push(leftWall);
+  scene.add(leftWall);
 
-// FRIDGE (next to range cooker)
-var fridge = createBox(0.65, 1.8, 0.65, steelMat, -4.2/2 + 1.2, 0.9, 2.72/2 - 0.4);
+  // Right wall sections (with door opening)
+  var rightWallTop = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 2.72/2 - 0.6), wallMat);
+  rightWallTop.position.set(4.2/2 + 0.075, 1.25, -2.72/4 - 0.3);
+  rightWallTop.receiveShadow = true;
+  walls.push(rightWallTop);
+  scene.add(rightWallTop);
 
-// Fridge handles
-var handleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-createBox(0.04, 0.3, 0.04, handleMat, -4.2/2 + 1.2 + 0.28, 1.3, 2.72/2 - 0.4);
-createBox(0.04, 0.3, 0.04, handleMat, -4.2/2 + 1.2 + 0.28, 0.6, 2.72/2 - 0.4);
+  var rightWallBottom = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 2.72/2 - 0.6), wallMat);
+  rightWallBottom.position.set(4.2/2 + 0.075, 1.25, 2.72/4 + 0.3);
+  rightWallBottom.receiveShadow = true;
+  walls.push(rightWallBottom);
+  scene.add(rightWallBottom);
 
-// KITCHEN SINK WITH COUNTER
-var sinkBase = createBox(0.8, 0.8, 0.6, counterMat, -4.2/2 + 2.47 + 1.2/2, 0.4, 2.72/2 - 0.35);
-var counterTop = createBox(0.8, 0.05, 0.6, counterMat, -4.2/2 + 2.47 + 1.2/2, 0.85, 2.72/2 - 0.35);
+  var doorTop = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 1.2), wallMat);
+  doorTop.position.set(4.2/2 + 0.075, 2.35, 0);
+  doorTop.receiveShadow = true;
+  walls.push(doorTop);
+  scene.add(doorTop);
 
-// Sink basin
-var sinkBasin = createBox(0.5, 0.15, 0.4, steelMat, -4.2/2 + 2.47 + 1.2/2, 0.77, 2.72/2 - 0.35);
+  // Front wall with window (2.47m + window + remaining)
+  var frontLeftWall = new THREE.Mesh(new THREE.BoxGeometry(2.47, 2.5, 0.15), wallMat);
+  frontLeftWall.position.set(-4.2/2 + 2.47/2, 1.25, 2.72/2 + 0.075);
+  frontLeftWall.receiveShadow = true;
+  walls.push(frontLeftWall);
+  scene.add(frontLeftWall);
 
-// Faucet
-var faucetBase = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.03, 0.04, 0.08, 16),
-    steelMat
-);
-faucetBase.position.set(-4.2/2 + 2.47 + 1.2/2, 0.92, 2.72/2 - 0.2);
-faucetBase.castShadow = true;
-scene.add(faucetBase);
+  var frontRightWall = new THREE.Mesh(new THREE.BoxGeometry(4.2 - 2.47 - 1.2, 2.5, 0.15), wallMat);
+  frontRightWall.position.set(4.2/2 - (4.2 - 2.47 - 1.2)/2, 1.25, 2.72/2 + 0.075);
+  frontRightWall.receiveShadow = true;
+  walls.push(frontRightWall);
+  scene.add(frontRightWall);
 
-var faucetNeck = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, 0.25, 16),
-    steelMat
-);
-faucetNeck.position.set(-4.2/2 + 2.47 + 1.2/2, 1.08, 2.72/2 - 0.2);
-faucetNeck.castShadow = true;
-scene.add(faucetNeck);
+  // Window bottom and top
+  var windowBottom = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.15), wallMat);
+  windowBottom.position.set(-4.2/2 + 2.47 + 1.2/2, 0.35, 2.72/2 + 0.075);
+  windowBottom.receiveShadow = true;
+  walls.push(windowBottom);
+  scene.add(windowBottom);
 
-var faucetHead = new THREE.Mesh(
-    new THREE.SphereGeometry(0.03, 16, 16),
-    steelMat
-);
-faucetHead.position.set(-4.2/2 + 2.47 + 1.2/2, 1.21, 2.72/2 - 0.2);
-scene.add(faucetHead);
+  var windowTop = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.15), wallMat);
+  windowTop.position.set(-4.2/2 + 2.47 + 1.2/2, 2.25, 2.72/2 + 0.075);
+  windowTop.receiveShadow = true;
+  walls.push(windowTop);
+  scene.add(windowTop);
 
-// COFFEE CORNER (top center area)
-var coffeeCounter = createBox(1.8, 0.8, 0.5, counterMat, 0.3, 0.4, -2.72/2 + 0.3);
-var coffeeTop = createBox(1.8, 0.05, 0.5, counterMat, 0.3, 0.85, -2.72/2 + 0.3);
+  // Window frame and glass
+  var frameMat = new THREE.MeshStandardMaterial({
+    color: 0x8b4513,
+    roughness: 0.6,
+    metalness: 0.2
+  });
+  var windowFrame = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.08), frameMat);
+  windowFrame.position.set(-4.2/2 + 2.47 + 1.2/2, 1.4, 2.72/2 + 0.12);
+  windowFrame.castShadow = true;
+  scene.add(windowFrame);
 
-// Coffee machine
-var coffeeMachineMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a });
-var coffeeMachine = createBox(0.35, 0.45, 0.35, coffeeMachineMat, -0.3, 1.125, -2.72/2 + 0.3);
+  var glassMat = new THREE.MeshStandardMaterial({
+    color: 0x88ccff,
+    transparent: true,
+    opacity: 0.3,
+    roughness: 0.05,
+    metalness: 0.9
+  });
+  var windowGlass = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.3, 0.02), glassMat);
+  windowGlass.position.set(-4.2/2 + 2.47 + 1.2/2, 1.4, 2.72/2 + 0.16);
+  scene.add(windowGlass);
 
-// Coffee machine display
-var displayMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00aa00 });
-createBox(0.12, 0.08, 0.02, displayMat, -0.3, 1.2, -2.72/2 + 0.3 + 0.18);
+  // TERRACE WALLS (proper angled shape)
+  // Back terrace wall
+  var terraceBackWall = new THREE.Mesh(new THREE.BoxGeometry(3.57 - 0.8, 2.5, 0.15), wallMat);
+  terraceBackWall.position.set(4.2/2 + (3.57 - 0.8)/2, 1.25, -2.72/2 - 0.075);
+  terraceBackWall.receiveShadow = true;
+  walls.push(terraceBackWall);
+  scene.add(terraceBackWall);
 
-// Coffee cups on counter
-var cupMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-for (var i = 0; i < 3; i++) {
-    var cup = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.03, 0.08, 16),
-        cupMat
+  // Right terrace wall
+  var terraceRightWall = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 2.72), wallMat);
+  terraceRightWall.position.set(4.2/2 + 3.57 + 0.075, 1.25, 0);
+  terraceRightWall.receiveShadow = true;
+  walls.push(terraceRightWall);
+  scene.add(terraceRightWall);
+
+  // Angled front terrace wall
+  var angleLength = Math.sqrt(Math.pow(0.8, 2) + Math.pow(2.72, 2));
+  var angledWall = new THREE.Mesh(new THREE.BoxGeometry(angleLength, 2.5, 0.15), wallMat);
+  angledWall.position.set(4.2/2 + 3.57 - 0.4, 1.25, 0);
+  angledWall.rotation.y = Math.atan2(2.72, -0.8);
+  angledWall.receiveShadow = true;
+  walls.push(angledWall);
+  scene.add(angledWall);
+
+  // DOOR between kitchen and terrace
+  var doorFrameMat = new THREE.MeshStandardMaterial({
+    color: 0x8b4513,
+    roughness: 0.6,
+    metalness: 0.2
+  });
+
+  var doorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.1, 0.12), doorFrameMat);
+  doorFrame.position.set(4.2/2 + 0.08, 1.05, 0);
+  doorFrame.castShadow = true;
+  scene.add(doorFrame);
+
+  var doorPanel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.05), glassMat);
+  doorPanel.position.set(4.2/2 + 0.1, 1.05, 0);
+  scene.add(doorPanel);
+
+  var handleMat = new THREE.MeshStandardMaterial({
+    color: 0xc0c0c0,
+    roughness: 0.3,
+    metalness: 0.8
+  });
+  var doorHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 16), handleMat);
+  doorHandle.rotation.z = Math.PI / 2;
+  doorHandle.position.set(4.2/2 + 0.12, 1.05, -0.4);
+  doorHandle.castShadow = true;
+  scene.add(doorHandle);
+
+  // TERRACE RAILING
+  var railMat = new THREE.MeshStandardMaterial({
+    color: 0x555555,
+    roughness: 0.4,
+    metalness: 0.7
+  });
+
+  // Back railing
+  for (var i = 0; i <= 8; i++) {
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), railMat);
+    post.position.set(4.2/2 + (3.57 - 0.8) * (i / 8), 0.5, -2.72/2);
+    post.castShadow = true;
+    scene.add(post);
+  }
+  var backRail = new THREE.Mesh(new THREE.BoxGeometry(3.57 - 0.8, 0.06, 0.1), railMat);
+  backRail.position.set(4.2/2 + (3.57 - 0.8)/2, 1.0, -2.72/2);
+  backRail.castShadow = true;
+  scene.add(backRail);
+
+  // Right side railing
+  for (var i = 0; i <= 6; i++) {
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), railMat);
+    post.position.set(4.2/2 + 3.57, 0.5, -2.72/2 + (2.72 * i / 6));
+    post.castShadow = true;
+    scene.add(post);
+  }
+  var rightRail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 2.72), railMat);
+  rightRail.position.set(4.2/2 + 3.57, 1.0, 0);
+  rightRail.castShadow = true;
+  scene.add(rightRail);
+
+  // Angled front railing
+  for (var i = 0; i <= 8; i++) {
+    var t = i / 8;
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.06), railMat);
+    post.position.set(
+      4.2/2 + 3.57 - 0.8 * t,
+      0.5,
+      -2.72/2 + 2.72 * t
     );
-    cup.position.set(0.5 + i * 0.15, 0.92, -2.72/2 + 0.3);
+    post.castShadow = true;
+    scene.add(post);
+  }
+  var angleRailLength = Math.sqrt(Math.pow(0.8, 2) + Math.pow(2.72, 2));
+  var angledRail = new THREE.Mesh(new THREE.BoxGeometry(angleRailLength, 0.06, 0.1), railMat);
+  angledRail.rotation.y = Math.atan2(2.72, -0.8);
+  angledRail.position.set(4.2/2 + 3.57 - 0.4, 1.0, 0);
+  angledRail.castShadow = true;
+  scene.add(angledRail);
+
+  // KITCHEN APPLIANCES
+  // Range Cooker (left front)
+  var steelMat = new THREE.MeshStandardMaterial({
+    color: 0xc0c0c0,
+    roughness: 0.2,
+    metalness: 0.8
+  });
+  var rangeCooker = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.85, 0.6), steelMat);
+  rangeCooker.position.set(-4.2/2 + 0.4, 0.425, 2.72/2 - 0.4);
+  rangeCooker.castShadow = true;
+  scene.add(rangeCooker);
+
+  var cooktopMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+  var cooktop = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.03, 0.58), cooktopMat);
+  cooktop.position.set(-4.2/2 + 0.4, 0.87, 2.72/2 - 0.4);
+  scene.add(cooktop);
+
+  // 4 burners
+  var burnerMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  for (var i = 0; i < 2; i++) {
+    for (var j = 0; j < 2; j++) {
+      var burner = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 32), burnerMat);
+      burner.position.set(
+        -4.2/2 + 0.4 + (i - 0.5) * 0.25,
+        0.89,
+        2.72/2 - 0.4 + (j - 0.5) * 0.25
+      );
+      scene.add(burner);
+    }
+  }
+
+  // Fridge
+  var fridge = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.8, 0.65), steelMat);
+  fridge.position.set(-4.2/2 + 1.2, 0.9, 2.72/2 - 0.4);
+  fridge.castShadow = true;
+  scene.add(fridge);
+
+  // Kitchen Counter and Sink
+  var counterMat = new THREE.MeshStandardMaterial({
+    color: 0x2f4f4f,
+    roughness: 0.3,
+    metalness: 0.6
+  });
+  counter = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.06, 0.6), counterMat);
+  counter.position.set(0, 0.88, -2.72/2 + 0.35);
+  counter.castShadow = true;
+  scene.add(counter);
+
+  var sinkMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.2,
+    metalness: 0.9
+  });
+  var sink = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.18, 0.15, 32), sinkMat);
+  sink.position.set(-4.2/2 + 2.47 + 1.2/2, 0.83, -2.72/2 + 0.35);
+  sink.castShadow = true;
+  scene.add(sink);
+
+  // Faucet
+  var faucetBase = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 16), sinkMat);
+  faucetBase.position.set(-4.2/2 + 2.47 + 1.2/2, 0.95, -2.72/2 + 0.2);
+  scene.add(faucetBase);
+
+  var faucetNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.25, 16), sinkMat);
+  faucetNeck.position.set(-4.2/2 + 2.47 + 1.2/2, 1.1, -2.72/2 + 0.2);
+  scene.add(faucetNeck);
+
+  // Potager (near door)
+  var cabinetMat = new THREE.MeshStandardMaterial({
+    color: 0x8b4513,
+    roughness: 0.6,
+    metalness: 0.3
+  });
+  var potagerBase = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.85, 0.6), cabinetMat);
+  potagerBase.position.set(4.2/2 - 0.4, 0.425, 0);
+  potagerBase.castShadow = true;
+  cabinets.push(potagerBase);
+  scene.add(potagerBase);
+
+  var potagerTop = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.6), steelMat);
+  potagerTop.position.set(4.2/2 - 0.4, 0.88, 0);
+  scene.add(potagerTop);
+
+  // Potager burners (4 burners)
+  for (var i = 0; i < 2; i++) {
+    for (var j = 0; j < 2; j++) {
+      var burner = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 32), burnerMat);
+      burner.position.set(
+        4.2/2 - 0.4 + (i - 0.5) * 0.25,
+        0.92,
+        0 + (j - 0.5) * 0.25
+      );
+      scene.add(burner);
+    }
+  }
+
+  // Coffee Corner
+  var coffeeCounter = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 0.5), cabinetMat);
+  coffeeCounter.position.set(0.5, 0.4, -2.72/2 + 0.3);
+  coffeeCounter.castShadow = true;
+  cabinets.push(coffeeCounter);
+  scene.add(coffeeCounter);
+
+  var coffeeTop = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 0.5), counterMat);
+  coffeeTop.position.set(0.5, 0.85, -2.72/2 + 0.3);
+  scene.add(coffeeTop);
+
+  var coffeeMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  var coffeeMachine = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.3), coffeeMat);
+  coffeeMachine.position.set(0.2, 1.1, -2.72/2 + 0.3);
+  coffeeMachine.castShadow = true;
+  scene.add(coffeeMachine);
+
+  // Coffee cups
+  var cupMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  for (var i = 0; i < 3; i++) {
+    var cup = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.03, 0.08, 16), cupMat);
+    cup.position.set(0.8 + i * 0.15, 0.92, -2.72/2 + 0.3);
     cup.castShadow = true;
     scene.add(cup);
+  }
 
-    // Cup handle
-    var handleGeo = new THREE.TorusGeometry(0.03, 0.008, 8, 16, Math.PI);
-    var handle = new THREE.Mesh(handleGeo, cupMat);
-    handle.rotation.y = Math.PI / 2;
-    handle.position.set(0.5 + i * 0.15 + 0.04, 0.92, -2.72/2 + 0.3);
-    scene.add(handle);
-}
+  // TERRACE FURNITURE
+  var tableMat = new THREE.MeshStandardMaterial({
+    color: 0x8b7355,
+    roughness: 0.6,
+    metalness: 0.3
+  });
 
-// POTAGER (4-burner stove near door)
-var potagerCounter = createBox(0.6, 0.85, 0.6, counterMat, 4.2/2 - 0.4, 0.425, 0);
-var potagerTop = createBox(0.6, 0.05, 0.6, steelMat, 4.2/2 - 0.4, 0.88, 0);
+  // Table
+  var tableTop = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.8), tableMat);
+  tableTop.position.set(5.5, 0.74, 0);
+  tableTop.castShadow = true;
+  scene.add(tableTop);
 
-// Potager burners
-for (var i = 0; i < 2; i++) {
+  for (var i = 0; i < 2; i++) {
     for (var j = 0; j < 2; j++) {
-        var burner = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.08, 0.08, 0.02, 32),
-            burnerMat
-        );
-        burner.position.set(
-            4.2/2 - 0.4 + (i - 0.5) * 0.25,
-            0.92,
-            0 + (j - 0.5) * 0.25
-        );
-        burner.castShadow = true;
-        scene.add(burner);
+      var leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.06), tableMat);
+      leg.position.set(
+        5.5 + (i - 0.5) * 1.0,
+        0.35,
+        (j - 0.5) * 0.6
+      );
+      leg.castShadow = true;
+      scene.add(leg);
     }
-}
+  }
 
-// DOOR TO TERRACE
-var doorFrame = createBox(0.9, 2.1, 0.15, woodMat, 4.2/2 + 0.075, 1.05, 0);
-var doorPanelMat = new THREE.MeshStandardMaterial({ color: 0x654321 });
-var doorPanel = createBox(0.8, 2.0, 0.05, doorPanelMat, 4.2/2 + 0.12, 1.05, 0);
+  // Chairs
+  var chairMat = new THREE.MeshStandardMaterial({
+    color: 0x444444,
+    roughness: 0.7,
+    metalness: 0.2
+  });
 
-// Door handle
-var doorHandleMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.9 });
-var doorHandle = new THREE.Mesh(
-    new THREE.SphereGeometry(0.04, 16, 16),
-    doorHandleMat
-);
-doorHandle.position.set(4.2/2 + 0.15, 1.05, -0.3);
-doorHandle.castShadow = true;
-scene.add(doorHandle);
-
-// TERRACE FENCE/RAILING
-var railHeight = 1.0;
-var postMat = new THREE.MeshStandardMaterial({ color: 0x654321 });
-
-// Back fence (along back edge of terrace)
-for (var i = 0; i <= 8; i++) {
-    var post = createBox(0.06, railHeight, 0.06, postMat, 
-        4.2/2 + (3.57 - 0.8) * (i / 8), railHeight / 2, -2.72/2);
-}
-// Top rail back
-createBox(3.57 - 0.8, 0.06, 0.1, postMat, 4.2/2 + (3.57 - 0.8)/2, railHeight, -2.72/2);
-
-// Front angled fence
-var angleLength = Math.sqrt(Math.pow(0.8, 2) + Math.pow(2.72, 2));
-for (var i = 0; i <= 8; i++) {
-    var t = i / 8;
-    var post = createBox(0.06, railHeight, 0.06, postMat,
-        4.2/2 + 3.57 - 0.8 * t,
-        railHeight / 2,
-        -2.72/2 + 2.72 * t
-    );
-}
-
-// Angled top rail
-var railAngle = new THREE.Mesh(
-    new THREE.BoxGeometry(angleLength, 0.06, 0.1),
-    postMat
-);
-railAngle.rotation.y = Math.atan2(2.72, -0.8);
-railAngle.position.set(4.2/2 + 3.57 - 0.4, railHeight, 2.72/2 - 1.36);
-railAngle.castShadow = true;
-scene.add(railAngle);
-
-// Right side fence (short side)
-for (var i = 0; i <= 5; i++) {
-    var post = createBox(0.06, railHeight, 0.06, postMat,
-        4.2/2 + 3.57,
-        railHeight / 2,
-        -2.72/2 + (2.72 * i / 5)
-    );
-}
-// Top rail right
-createBox(0.1, 0.06, 2.72, postMat, 4.2/2 + 3.57, railHeight, 0);
-
-// TERRACE FURNITURE
-// Table
-var tableTop = createBox(1.2, 0.04, 0.8, woodMat, 5.5, 0.74, 0);
-
-// Table legs
-for (var i = 0; i < 2; i++) {
-    for (var j = 0; j < 2; j++) {
-        createBox(0.06, 0.7, 0.06, woodMat,
-            5.5 + (i - 0.5) * 1.0,
-            0.35,
-            (j - 0.5) * 0.6
-        );
-    }
-}
-
-// Chairs
-for (var c = 0; c < 2; c++) {
-    var chairX = 5.5 + (c === 0 ? -0.9 : 0.9);
+  for (var c = 0; c < 2; c++) {
+    var chairX = 5.5 + (c === 0 ? -1.0 : 1.0);
     
-    // Seat
-    createBox(0.4, 0.05, 0.4, woodMat, chairX, 0.48, 0.1);
-    
-    // Backrest
-    createBox(0.4, 0.5, 0.05, woodMat, chairX, 0.73, -0.075);
-    
-    // Legs
+    var seat = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.4), chairMat);
+    seat.position.set(chairX, 0.48, 0);
+    seat.castShadow = true;
+    scene.add(seat);
+
+    var back = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.05), chairMat);
+    back.position.set(chairX, 0.73, -0.175);
+    back.castShadow = true;
+    scene.add(back);
+
     for (var i = 0; i < 2; i++) {
-        for (var j = 0; j < 2; j++) {
-            createBox(0.05, 0.48, 0.05, woodMat,
-                chairX + (i - 0.5) * 0.3,
-                0.24,
-                0.1 + (j - 0.5) * 0.3
-            );
-        }
+      for (var j = 0; j < 2; j++) {
+        var leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.48, 0.05), chairMat);
+        leg.position.set(
+          chairX + (i - 0.5) * 0.3,
+          0.24,
+          (j - 0.5) * 0.3
+        );
+        leg.castShadow = true;
+        scene.add(leg);
+      }
     }
+  }
+
+  // Ceiling
+  var ceilingMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.9
+  });
+  var ceiling = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.05, 2.72), ceilingMat);
+  ceiling.position.set(0, 2.5, 0);
+  ceiling.receiveShadow = true;
+  scene.add(ceiling);
+
+  // Grid helper
+  var grid = new THREE.GridHelper(20, 40, 0x888888, 0xcccccc);
+  grid.position.y = 0;
+  scene.add(grid);
 }
 
-// Grid helper (for reference)
-var gridHelper = new THREE.GridHelper(15, 30, 0x888888, 0xcccccc);
-gridHelper.position.y = 0;
-scene.add(gridHelper);
+function addControls() {
+  var canvas = renderer.domElement;
+  
+  // Mouse controls
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mouseleave', onMouseUp);
+  canvas.addEventListener('wheel', onMouseWheel, { passive: false });
+  
+  // Touch controls
+  canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  canvas.addEventListener('touchend', onTouchEnd);
+}
 
-// Animation
-var mouseX = 0;
-var mouseY = 0;
+function onMouseDown(e) {
+  isDragging = true;
+  previousMousePosition = { x: e.clientX, y: e.clientY };
+  isRotating = false;
+}
 
-document.addEventListener('mousemove', function(event) {
-    mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-    mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-});
+function onMouseMove(e) {
+  if (!isDragging) return;
+
+  var deltaX = e.clientX - previousMousePosition.x;
+  var deltaY = e.clientY - previousMousePosition.y;
+
+  cameraRotation.y += deltaX * 0.005;
+  cameraRotation.x += deltaY * 0.005;
+  cameraRotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotation.x));
+
+  updateCameraPosition();
+  previousMousePosition = { x: e.clientX, y: e.clientY };
+}
+
+function onMouseUp() {
+  isDragging = false;
+}
+
+function onMouseWheel(e) {
+  e.preventDefault();
+  cameraDistance += e.deltaY * 0.01;
+  cameraDistance = Math.max(4, Math.min(15, cameraDistance));
+  updateCameraPosition();
+}
+
+function onTouchStart(e) {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    isRotating = false;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+    touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+  }
+}
+
+function onTouchMove(e) {
+  e.preventDefault();
+  
+  if (e.touches.length === 1 && isDragging) {
+    var deltaX = e.touches[0].clientX - touchStartX;
+    var deltaY = e.touches[0].clientY - touchStartY;
+    
+    cameraRotation.y += deltaX * 0.005;
+    cameraRotation.x += deltaY * 0.005;
+    cameraRotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, cameraRotation.x));
+    
+    updateCameraPosition();
+    
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  } else if (e.touches.length === 2) {
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+    var distance = Math.sqrt(dx * dx + dy * dy);
+    
+    var delta = distance - touchStartDistance;
+    cameraDistance -= delta * 0.02;
+    cameraDistance = Math.max(4, Math.min(15, cameraDistance));
+    
+    updateCameraPosition();
+    touchStartDistance = distance;
+  }
+}
+
+function onTouchEnd() {
+  isDragging = false;
+}
+
+function updateCameraPosition() {
+  if (currentView === 'perspective') {
+    var x = Math.sin(cameraRotation.y) * Math.cos(cameraRotation.x) * cameraDistance;
+    var y = Math.sin(cameraRotation.x) * cameraDistance + 2;
+    var z = Math.cos(cameraRotation.y) * Math.cos(cameraRotation.x) * cameraDistance;
+    
+    camera.position.set(x, y, z);
+    camera.lookAt(0, 1, 0);
+  }
+}
 
 function animate() {
-    requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 
-    // Smooth camera movement
-    var targetX = 8 + mouseX * 4;
-    var targetY = 5 + mouseY * 2;
-    
-    camera.position.x += (targetX - camera.position.x) * 0.05;
-    camera.position.y += (targetY - camera.position.y) * 0.05;
-    camera.lookAt(2, 0.5, 0);
+  if (isRotating && currentView === 'perspective' && !isDragging) {
+    angle += 0.002;
+    cameraRotation.y = angle;
+    updateCameraPosition();
+  }
 
-    renderer.render(scene, camera);
+  renderer.render(scene, camera);
 }
 
-animate();
+function setView(view) {
+  currentView = view;
+  var buttons = document.querySelectorAll('#controls button');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].classList.remove('active');
+  }
+  document.getElementById('btn-' + view).classList.add('active');
 
-// Handle window resize
+  isRotating = false;
+
+  if (view === 'perspective') {
+    cameraRotation = { x: 0.3, y: angle };
+    cameraDistance = 8;
+    updateCameraPosition();
+  } else if (view === 'front') {
+    camera.position.set(0, 1.5, 6);
+    camera.lookAt(0, 1, 0);
+  } else if (view === 'top') {
+    camera.position.set(2, 10, 0);
+    camera.lookAt(2, 0, 0);
+  } else if (view === 'side') {
+    camera.position.set(8, 1.5, 0);
+    camera.lookAt(0, 1, 0);
+  }
+}
+
+function changeWallColor(color) {
+  for (var i = 0; i < walls.length; i++) {
+    walls[i].material.color.set(color);
+  }
+}
+
+function changeCabinetColor(color) {
+  for (var i = 0; i < cabinets.length; i++) {
+    cabinets[i].material.color.set(color);
+  }
+}
+
+function changeCounterColor(color) {
+  counter.material.color.set(color);
+}
+
+function changeFloorColor(color) {
+  floor.material.color.set(color);
+  terraceFloor.material.color.set(color);
+}
+
+function changeLighting(value) {
+  directionalLight.intensity = parseFloat(value);
+  document.getElementById('lightValue').textContent = value;
+}
+
+function toggleRotation() {
+  isRotating = !isRotating;
+  var btn = document.getElementById('rotateBtn');
+  if (isRotating) {
+    btn.textContent = 'Pause Rotation';
+  } else {
+    btn.textContent = 'Resume Rotation';
+  }
+}
+
+function resetCamera() {
+  cameraRotation = { x: 0.3, y: 0 };
+  cameraDistance = 8;
+  angle = 0;
+  isRotating = true;
+  setView('perspective');
+  document.getElementById('rotateBtn').textContent = 'Pause Rotation';
+}
+
+function toggleControls() {
+  var controls = document.getElementById('controls');
+  var btn = document.getElementById('toggleBtn');
+  
+  if (controls.style.display === 'none' || controls.style.display === '') {
+    controls.style.display = 'block';
+    btn.textContent = '✕';
+  } else {
+    controls.style.display = 'none';
+    btn.textContent = '☰';
+  }
+}
+
 window.addEventListener('resize', function() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+window.addEventListener('load', init);
