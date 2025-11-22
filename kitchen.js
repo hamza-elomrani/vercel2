@@ -365,14 +365,7 @@ function createKitchen() {
   ceilingMat.color = new THREE.Color(0xffffff);
   ceilingMat.roughness = 0.9;
   
-  var ceiling = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.05, 2.72), ceilingMat);
-  ceiling.position.set(0, 2.5, 0);
-  ceiling.receiveShadow = true;
-  scene.add(ceiling);
-
-  var terraceCeiling = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.05, 2.72), ceilingMat);
-  terraceCeiling.position.set(3.85, 2.5, 0);
-  scene.add(terraceCeiling);
+  // No ceiling - removed as per user request
 }
 
 function addDimensionLabels() {
@@ -395,24 +388,53 @@ function addDimensionLabels() {
     return texture;
   }
 
-  var labelMat420 = new THREE.MeshBasicMaterial({ map: createTextTexture('4.20m'), side: THREE.DoubleSide });
+  // Top: 4.20m (kitchen width)
+  var labelMat420 = new THREE.MeshBasicMaterial({ map: createTextTexture('4.20 m'), side: THREE.DoubleSide });
   var label420 = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.25), labelMat420);
-  label420.position.set(0, 0.02, 1.5);
-  label420.rotation.x = -Math.PI / 2;
+  label420.position.set(0, 2.6, -1.5);
   scene.add(label420);
 
-  var labelMat272 = new THREE.MeshBasicMaterial({ map: createTextTexture('2.72m'), side: THREE.DoubleSide });
+  // Left side: 2.72m (kitchen depth)
+  var labelMat272 = new THREE.MeshBasicMaterial({ map: createTextTexture('2.72 m'), side: THREE.DoubleSide });
   var label272 = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.25), labelMat272);
-  label272.position.set(-2.3, 0.02, 0);
-  label272.rotation.x = -Math.PI / 2;
-  label272.rotation.z = Math.PI / 2;
+  label272.position.set(-2.4, 1.5, 0);
+  label272.rotation.y = Math.PI / 2;
   scene.add(label272);
 
-  var labelMat120 = new THREE.MeshBasicMaterial({ map: createTextTexture('1.20m'), side: THREE.DoubleSide });
-  var label120 = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.2), labelMat120);
-  label120.position.set(0.88, 0.02, 1.5);
-  label120.rotation.x = -Math.PI / 2;
+  // Bottom left: 2.47m
+  var labelMat247 = new THREE.MeshBasicMaterial({ map: createTextTexture('2.47 m'), side: THREE.DoubleSide });
+  var label247 = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), labelMat247);
+  label247.position.set(-0.865, 0.05, 1.6);
+  scene.add(label247);
+
+  // Bottom middle: 1.20m (window/door)
+  var labelMat120 = new THREE.MeshBasicMaterial({ map: createTextTexture('1.20 m'), side: THREE.DoubleSide });
+  var label120 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.15), labelMat120);
+  label120.position.set(0.88, 0.05, 1.6);
   scene.add(label120);
+
+  // Bottom right: 3.57m
+  var labelMat357 = new THREE.MeshBasicMaterial({ map: createTextTexture('3.57 m'), side: THREE.DoubleSide });
+  var label357 = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.25), labelMat357);
+  label357.position.set(3.85, 0.05, 1.6);
+  scene.add(label357);
+
+  // Counter depth: 10cm labels
+  var labelMat10cm = new THREE.MeshBasicMaterial({ map: createTextTexture('10 cm'), side: THREE.DoubleSide });
+  
+  var label10cm1 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.1), labelMat10cm);
+  label10cm1.position.set(0, 2.2, -1.0);
+  scene.add(label10cm1);
+
+  var label10cm2 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.1), labelMat10cm);
+  label10cm2.position.set(-1.5, 0.05, -0.7);
+  scene.add(label10cm2);
+
+  // Potager width: 20cm
+  var labelMat20cm = new THREE.MeshBasicMaterial({ map: createTextTexture('20 cm'), side: THREE.DoubleSide });
+  var label20cm = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.1), labelMat20cm);
+  label20cm.position.set(1.4, 1.2, -0.85);
+  scene.add(label20cm);
 }
 
 function addMouseControls() {
